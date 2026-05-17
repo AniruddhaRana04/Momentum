@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo App - Professional Task Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="toast-container" id="flashToastContainer">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" role="alert">
+                        <i class="fas fa-{% if category == 'success' %}check-circle{% else %}exclamation-circle{% endif %}"></i>
+                        <span>{{ message }}</span>
+                        <button class="alert-close" onclick="this.parentElement.remove();">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <i class="fas fa-check-double"></i>
+                <span>Momentum</span>
+            </div>
+            <div class="navbar-controls">
+                <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <!-- Sidebar Stats -->
+        <aside class="sidebar">
+            <div class="stats-card">
+                <div class="stat-item">
+                    <div class="stat-icon total">
+                        <i class="fas fa-list-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Tasks</div>
+                        <div class="stat-number" id="statTotal">{{ stats.total }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-item">
+                    <div class="stat-icon completed">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Completed</div>
+                        <div class="stat-number" id="statCompleted">{{ stats.completed }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stat-item">
+                    <div class="stat-icon pending">
+                        <i class="fas fa-hourglass-end"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Pending</div>
+                        <div class="stat-number" id="statPending">{{ stats.pending }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress-card">
+                <div class="progress-label">Progress</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: {% if stats.total > 0 %}{{ (stats.completed / stats.total * 100)|int }}{% else %}0{% endif %}%"></div>
+                </div>
+                <div class="progress-text" id="progressText">
+                    {% if stats.total > 0 %}{{ (stats.completed / stats.total * 100)|int }}%{% else %}0%{% endif %}
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <section class="content-section">
+            <!-- Header -->
+            <div class="header">
+                <h1>My Tasks</h1>
+                <p class="header-subtitle">Stay organized and productive</p>
+                <p class="header-timestamp">Current time in <strong>Kolkata</strong></p>
+            </div>
+
+            <!-- Add Todo Section -->
+            <div class="add-todo-section">
+                <div class="add-todo-card">
+                    <form id="addTodoForm" method="POST" action="{{ url_for('add_todo') }}" class="add-todo-form">
+                        <div class="input-group">
+                            <i class="fas fa-plus"></i>
+                            <input 
+                                type="text" 
+                                id="todoInput" 
+                                name="title" 
+                                placeholder="Add a new task..." 
+                                class="todo-input"
+                                maxlength="200"
+                                autocomplete="off"
+                            >
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-arrow-right"></i>
+                            <span>Add Task</span>
+                        </button>
+                    </form>
+                    <div class="char-count" id="charCount">0/200</div>
+                </div>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="filter-section">
+                <button class="filter-btn active" id="filterAll" data-filter="all">
+                    <i class="fas fa-list"></i> All
+                </button>
+                <button class="filter-btn" id="filterPending" data-filter="pending">
+                    <i class="fas fa-hourglass-end"></i> Pending
+                </button>
+                <button class="filter-btn" id="filterCompleted" data-filter="completed">
+                    <i class="fas fa-check-circle"></i> Completed
+                </button>
+            </div>
+
+            <!-- Search Section -->
+            <div class="search-section">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Search tasks..." 
+                        class="search-input"
+                        autocomplete="off"
+                    >
+                    <button class="search-clear" id="searchClear" onclick="clearSearch()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Todo List -->
+            <div class="todos-container">
+                {% if todos %}
+                    <div class="todos-list" id="todosList">
+                        {% for todo in todos %}
+                            <div class="todo-item" data-id="{{ todo.id }}" data-completed="{{ todo.completed|lower }}">
+                                <div class="todo-checkbox">
+                                    <input 
+                                        type="checkbox" 
+                                        class="checkbox-input" 
+                                        {% if todo.completed %}checked{% endif %}
+                                        onchange="toggleTodo('{{ todo.id }}', this)"
+                                    >
+                                    <span class="checkbox-custom"></span>
+                                </div>
+                                <div class="todo-content">
+                                    <p class="todo-title {% if todo.completed %}completed{% endif %}">{{ todo.title }}</p>
+                                    <small class="todo-time">
+                                        <i class="fas fa-clock"></i>
+                                        {{ todo.created_at }}
+                                    </small>
+                                </div>
+                                <div class="todo-actions">
+                                    <button class="btn-icon btn-edit" onclick="editTodo('{{ todo.id }}', '{{ todo.title|replace("'", "\\'") }}')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-icon btn-delete" onclick="deleteTodo('{{ todo.id }}')" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-icon">
+                            <i class="fas fa-inbox"></i>
+                        </div>
+                        <h2>No tasks yet</h2>
+                        <p>Create your first task to get started!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Task</h2>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="editForm" class="modal-form">
+                <input type="hidden" id="editTodoId">
+                <div class="form-group">
+                    <label for="editTodoTitle">Task Title</label>
+                    <input 
+                        type="text" 
+                        id="editTodoTitle" 
+                        class="form-input" 
+                        maxlength="200"
+                        required
+                    >
+                    <small class="char-count-edit">0/200</small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
